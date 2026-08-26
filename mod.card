@@ -1,28 +1,38 @@
 -- Sharing metadata read by tooling and the mod manager's detail pane; never
 -- by the loader's merge.
 return {
-  summary = "Hold B to run at FireRed's running-shoes speed: twice walking, "
-    .. "the pace the BICYCLE already rides at.",
+  summary = "Hold B to run at FireRed's running-shoes speed, and ride the "
+    .. "BICYCLE at twice the speed Gen 1 gives it.",
   author = "wild1walker",
   contact = "https://github.com/wild1walker/Gen1Sprint",
-  tags = { "overworld", "movement", "quality-of-life", "running-shoes" },
+  tags = { "overworld", "movement", "quality-of-life", "running-shoes",
+    "bicycle" },
   differences = {
     changed = {
       "holding B in the overworld halves the length of a step, 16 frames "
         .. "per tile to 8, which is FireRed's running-shoes speed and this "
         .. "engine's own BICYCLE speed (SPRINT: OFF restores it)",
+      "the BICYCLE rides at 4 frames per tile instead of 8, out of the box "
+        .. "and with nothing held -- the one default here that departs from "
+        .. "vanilla rather than preserving it, because an 8-frame bicycle is "
+        .. "no faster than the sprint it now sits beside (BIKE SPEED: "
+        .. "VANILLA restores it)",
     },
     added = {
-      "SPRINT, HOLD, SPRINT SPEED, SPRINT SURFING and SPRINT ON BIKE rows "
-        .. "under MODS > Gen1Sprint > OPTIONS",
+      "SPRINT, HOLD, SPRINT SPEED, BIKE SPEED, SPRINT SURFING and SPRINT "
+        .. "ON BIKE rows under MODS > Gen1Sprint > OPTIONS",
       "a sprint export -- active(game), settings(), stepFrames(frames, ctx) "
         .. "-- for a neighbouring mod that wants to know when the player is "
         .. "running",
     },
     known = {
-      "surfing and the bicycle are left at vanilla speed unless their own "
-        .. "rows are turned on, which is the FireRed answer: running shoes "
-        .. "are a thing you do on foot",
+      "the faster bicycle is game feel and not FireRed parity: FireRed's "
+        .. "bicycle is MOVE_SPEED_FAST_1, the same 8 frames per tile its "
+        .. "running shoes use, so there the two are the same speed.  4 is "
+        .. "FireRed's Cycling Road roll (MOVE_SPEED_FASTER), borrowed",
+      "surfing is left at vanilla speed unless its own row is turned on, "
+        .. "which is the FireRed answer: running shoes are a thing you do "
+        .. "on foot",
       "a step already under way keeps the duration it started with, so "
         .. "pressing or releasing the button lands on the next tile rather "
         .. "than mid-stride -- the same rule the bicycle follows",
