@@ -1,0 +1,42 @@
+-- Sharing metadata read by tooling and the mod manager's detail pane; never
+-- by the loader's merge.
+return {
+  summary = "Hold B to run at FireRed's running-shoes speed: twice walking, "
+    .. "the pace the BICYCLE already rides at.",
+  author = "wild1walker",
+  contact = "https://github.com/wild1walker/Gen1Sprint",
+  tags = { "overworld", "movement", "quality-of-life", "running-shoes" },
+  differences = {
+    changed = {
+      "holding B in the overworld halves the length of a step, 16 frames "
+        .. "per tile to 8, which is FireRed's running-shoes speed and this "
+        .. "engine's own BICYCLE speed (SPRINT: OFF restores it)",
+    },
+    added = {
+      "SPRINT, HOLD, SPRINT SPEED, SPRINT SURFING and SPRINT ON BIKE rows "
+        .. "under MODS > Gen1Sprint > OPTIONS",
+      "a sprint export -- active(game), settings(), stepFrames(frames, ctx) "
+        .. "-- for a neighbouring mod that wants to know when the player is "
+        .. "running",
+    },
+    known = {
+      "surfing and the bicycle are left at vanilla speed unless their own "
+        .. "rows are turned on, which is the FireRed answer: running shoes "
+        .. "are a thing you do on foot",
+      "a step already under way keeps the duration it started with, so "
+        .. "pressing or releasing the button lands on the next tile rather "
+        .. "than mid-stride -- the same rule the bicycle follows",
+      "the step is measured in engine frames, so a game-speed override "
+        .. "stretches or shortens the sprint the same way it does the walk",
+    },
+  },
+  credits = {
+    { who = "Gen1Recomp", for_ = "the movement.speed seam this mod is built "
+      .. "on, which names running shoes in its own comment" },
+    { who = "pret/pokered", for_ = "home/overworld.asm DoBikeSpeedup -- the "
+      .. "8-frame step and the mid-ledge-hop exception both come from there" },
+    { who = "Game Freak", for_ = "the running shoes themselves, by way of "
+      .. "FireRed" },
+  },
+  compat = { engine = ">=0.0.0-0 <2.0.0", modApi = 2 },
+}

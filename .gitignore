@@ -1,0 +1,4 @@
+dist/
+*.zip
+*.modpkg
+.DS_Store
