@@ -1,7 +1,7 @@
 {
   "id": "gen1_sprint",
   "name": "Gen1Sprint",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "api": 2,
   "entry": "main.lua",
   "profile": "content",
@@ -17,5 +17,5 @@
   ],
   "experimental": false,
   "github": "wild1walker/Gen1Sprint",
-  "description": "Hold B to run at FireRed's running-shoes speed: twice walking, the same pace the BICYCLE already rides at."
+  "description": "Hold B to run at FireRed's running-shoes speed, and ride the BICYCLE at twice the speed Gen 1 gives it."
 }

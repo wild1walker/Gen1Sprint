@@ -20,6 +20,7 @@ local Options = {}
 -- Gen 1's own BICYCLE rides at (src/world/FieldDefaults.lua bikeStepFrames),
 -- so sprinting on foot lands on a speed the engine already animates cleanly.
 Options.MULTIPLIERS = {
+  ["1"] = 1,       -- VANILLA: the engine's own answer, untouched
   ["1_5"] = 1.5,
   ["2"] = 2,
   ["3"] = 3,
@@ -44,11 +45,40 @@ Options.schema = {
 
   { key = "speed", type = "choice", label = "SPRINT SPEED", default = "2",
     choices = {
-      { "2x", "2" },
       { "1.5x", "1_5" },
+      { "2x", "2" },
       { "3x", "3" },
     },
     visible_if = { key = "enabled", equals = true } },
+
+  -- ------- the bicycle
+  -- Not a sprint row: this one applies whether or not anything is held, and
+  -- it stays visible with SPRINT: OFF, because a player who wants only the
+  -- faster bike is entitled to exactly that and nothing else.
+  --
+  -- The default is 2x, and it is a departure from vanilla rather than a
+  -- restoration of it -- the one row in this mod that is.  Gen 1's bicycle
+  -- is 8 frames per tile, which is precisely what a 2x sprint already gives
+  -- you on foot, so with this mod installed and the bike left alone the
+  -- bicycle is not a faster way to travel at all.  2x here puts it at 4 and
+  -- restores the ladder: 16 walking, 8 sprinting, 4 riding.
+  --
+  -- It is a game-feel choice and not a parity one, and it is worth being
+  -- straight about which.  FireRed's bicycle is MOVE_SPEED_FAST_1 -- 8
+  -- frames per tile, the same constant its running shoes use -- so in
+  -- FireRed the two really are the same speed and the bike is the poorer
+  -- deal, working in strictly fewer places for no gain.  4 is not FireRed's
+  -- ordinary bike; it is FireRed's Cycling Road roll (MOVE_SPEED_FASTER),
+  -- borrowed because it is the speed that game does reach on a bicycle.
+  -- VANILLA is one row away and restores Gen 1's 8 exactly.
+
+  { key = "bike_speed", type = "choice", label = "BIKE SPEED", default = "2",
+    choices = {
+      { "VANILLA", "1" },
+      { "1.5x", "1_5" },
+      { "2x", "2" },
+      { "3x", "3" },
+    } },
 
   -- ------- where it applies
   -- Both default OFF, which is the FireRed answer: running shoes are a

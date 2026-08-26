@@ -51,19 +51,44 @@ overworld reads nowhere at all.
 
 | Row | Values | Default | What it does |
 | --- | --- | --- | --- |
-| `SPRINT` | on / off | on | `OFF` unsubscribes the hook — the untouched game, see below |
+| `SPRINT` | on / off | on | `OFF` and the sprint stops entirely |
 | `HOLD` | `B` / `SELECT` | `B` | which button to hold |
-| `SPRINT SPEED` | `2x` / `1.5x` / `3x` | `2x` | `2x` is FireRed's running shoes, and the BICYCLE's own speed |
-| `SPRINT SURFING` | on / off | off | apply it on water too |
-| `SPRINT ON BIKE` | on / off | off | apply it *on top of* the bike, making 8 frames into 4 |
+| `SPRINT SPEED` | `1.5x` / `2x` / `3x` | `2x` | `2x` is FireRed's running shoes |
+| `BIKE SPEED` | `VANILLA` / `1.5x` / `2x` / `3x` | `2x` | the BICYCLE's own speed, held or not — `VANILLA` restores Gen 1's 8 |
+| `SPRINT SURFING` | on / off | off | apply the sprint on water too |
+| `SPRINT ON BIKE` | on / off | off | apply the sprint *on top of* `BIKE SPEED` |
 
 The two `off` rows are the FireRed answer: running shoes are a thing you do on
-foot. Leave them alone and surfing and cycling are exactly the speeds they have
-always been.
+foot. Leave them alone and surfing is exactly the speed it has always been.
 
 `SPRINT SPEED` is stored as a multiplier on the step the engine was about to
 take, not as a frame count, so it composes: `2x` means 2x whatever you were
 already doing, and a mod that changes walking speed keeps its ratio.
+
+## The bicycle, so it stays worth riding
+
+`BIKE SPEED` defaults to `2x`, putting the BICYCLE at **4 frames per tile**.
+It is the one row here whose default departs from vanilla instead of
+preserving it, and it exists because the sprint would otherwise make the bike
+pointless: Gen 1's bicycle is 8 frames per tile, which is exactly what a `2x`
+sprint already gives you on foot. Installed and left alone, riding stopped
+being a faster way to travel than walking with B held.
+
+`2x` restores the ladder — **16 walking, 8 sprinting, 4 riding** — and each
+rung is twice the one before it. `BIKE SPEED: VANILLA` puts Gen 1's 8 back
+exactly, and the row applies whether or not anything is held, so it is not a
+sprint modifier and does not disappear when `SPRINT` is off.
+
+**This one is game feel, not FireRed parity, and the two point different ways
+here.** FireRed's bicycle is `MOVE_SPEED_FAST_1` — 8 frames per tile, the
+*same constant* its running shoes use — so in FireRed they really are the same
+speed, and the bike is the worse deal: across 425 maps, 85 allow running but
+not cycling, and **none** allow cycling but not running. Its only genuine
+advantages there are reaching Cycling Road at all and the downhill roll. So 4
+is not FireRed's ordinary bike speed; it is FireRed's Cycling Road roll
+(`MOVE_SPEED_FASTER`), borrowed because it is the speed that game does reach
+on a bicycle. If you would rather have the authentic arrangement, that is what
+`VANILLA` is.
 
 ## It does not cost you frames
 
@@ -92,12 +117,14 @@ That seam is a cold path, which is the whole point:
   flattened to four plain values once and rebuilt only when the manager
   broadcasts `mod.options_changed`. Changing a row takes effect on your next
   step; nothing polls in between.
-- **`SPRINT: OFF` unsubscribes.** It does not return early inside the hook —
-  it removes the link from the chain. The engine guards its call site with
-  `Runtime.wantsHook("movement.speed")` and only builds the context table when
-  some mod is listening, so with the chain empty the game is left doing one
-  table lookup per step and nothing else. Switched off, this mod costs exactly
-  what it costs uninstalled.
+- **A mod with nothing to say unsubscribes.** It does not return early inside
+  the hook — it removes the link from the chain. The engine guards its call
+  site with `Runtime.wantsHook("movement.speed")` and only builds the context
+  table when some mod is listening, so with the chain empty the game is left
+  doing one table lookup per step and nothing else. Turned all the way off —
+  `SPRINT: OFF` *and* `BIKE SPEED: VANILLA` — this mod costs exactly what it
+  costs uninstalled. Either row alone is enough to keep the link, because
+  dropping it would quietly take the other one's setting with it.
 
 ## Building and testing
 

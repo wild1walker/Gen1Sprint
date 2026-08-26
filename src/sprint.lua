@@ -8,44 +8,63 @@
 -- patch, override or re-implement: the mod answers a question the engine
 -- was already asking.
 --
+-- Two independent things come out of that one link:
+--
+--   * the SPRINT, which shortens a step while its button is held, and
+--   * the BIKE SPEED, which shortens every step taken on the bicycle
+--     whether or not anything is held at all.
+--
+-- They stack, in that order, and either can be switched off without the
+-- other noticing.
+--
 -- WHY THIS DOES NOT COST FRAMES, since a speed mod is an easy place to make
 -- the game stutter:
 --
 --   * stepLength is called once per STEP, from Player:tryMove as the step
 --     begins -- never per frame.  Walking, that is once every 16 frames;
---     sprinting, once every 8.  Roughly four to eight calls a second while
+--     riding, once every four to eight.  A handful of calls a second while
 --     the player is moving, and none at all while they stand still, sit in
 --     a menu, or fight a battle.
 --   * The call site is guarded by Runtime.wantsHook("movement.speed"), which
 --     is one table lookup, and the ctx table is only built when some mod is
---     subscribed.  So SPRINT: OFF unsubscribes (see Sprint.install) instead
---     of returning early: with the chain empty the engine allocates nothing
---     and the mod switched off costs precisely what the mod uninstalled does.
+--     subscribed.  So a mod with nothing to say unsubscribes (see
+--     Sprint.install) rather than returning early: with the chain empty the
+--     engine allocates nothing, and the mod turned all the way off costs
+--     precisely what the mod uninstalled does.
 --   * The link itself does a few table reads, one comparison per gate and
---     one divide.  It allocates nothing: the settings table is one this
---     closure already owns, and the ctx is the engine's, forwarded rather
---     than copied.
+--     at most two divides.  It allocates nothing: the settings table is one
+--     this closure already owns, and the ctx is the engine's, forwarded
+--     rather than copied.
 --
 -- The follower comes along on its own -- PikachuFollower copies the player's
 -- live stepFramesCur onto itself every step -- and the walk-cycle clock is
 -- deliberately independent of step length in Player:update, so legs keep a
--- constant cadence and the sprint reads as covering more ground per stride
--- rather than as an animation played at double speed.  That is the same
--- thing the BICYCLE has always done here.
+-- constant cadence and a shortened step reads as covering more ground per
+-- stride rather than as an animation played at double speed.  That is the
+-- same thing the BICYCLE has always done here.
 
 local Sprint = {}
 
 Sprint.HOOK = "movement.speed"
 
--- The five option rows, flattened to the four plain values the hot path
--- reads.  Rebuilt only when mod.options_changed says something moved.
+-- The option rows, flattened to the plain values the hot path reads.
+-- Rebuilt only when mod.options_changed says something moved.
 function Sprint.snapshot(opt, multipliers)
   return {
-    button = opt("button"),
-    mult = multipliers[opt("speed")] or 2,
-    surf = opt("surf") and true or false,
-    bike = opt("bike") and true or false,
+    sprint   = opt("enabled") and true or false,
+    button   = opt("button"),
+    mult     = multipliers[opt("speed")] or 2,
+    bikeMult = multipliers[opt("bike_speed")] or 1,
+    surf     = opt("surf") and true or false,
+    bike     = opt("bike") and true or false,
   }
+end
+
+-- True when the settings would change at least one step somewhere.  What
+-- Sprint.install subscribes on, and the reason BIKE SPEED alone is enough to
+-- keep the link on the chain with SPRINT switched off.
+function Sprint.wouldActOn(cfg)
+  return cfg.sprint or cfg.bikeMult ~= 1
 end
 
 -- `read` is a zero-argument function returning the current snapshot.
@@ -59,32 +78,45 @@ function Sprint.newWrapper(read)
       return next(frames, ctx)
     end
 
-    local input = ctx.input
-    if not input or not input.isDown then return next(frames, ctx) end
-
-    local cfg = read()
-    if not input:isDown(cfg.button) then return next(frames, ctx) end
-
-    -- Where the sprint stands down.  Both rows default OFF, which is the
-    -- FireRed answer: running shoes are a thing you do on foot, and an
-    -- untouched install keeps vanilla surf and vanilla bike speeds.
-    if ctx.surfing and not cfg.surf then return next(frames, ctx) end
-    if ctx.onBike and not cfg.bike then return next(frames, ctx) end
-
-    -- Mid-ledge-hop the engine already refuses the bike's speedup: pokered
-    -- skips DoBikeSpeedup while BIT_LEDGE_OR_FISHING is set, and
-    -- Player:stepLength ports that by forcing onBike false during a hop.
-    -- The hop arc is drawn against the step's own progress, so shortening
-    -- the step mid-air lands the sprite early and reads as a teleport.
-    -- Stand down on exactly the frames vanilla does.
+    -- Mid-ledge-hop nothing is shortened, sprint or bicycle.  pokered skips
+    -- DoBikeSpeedup while BIT_LEDGE_OR_FISHING is set, and Player:stepLength
+    -- ports that by forcing onBike false for the hop.  The hop arc is drawn
+    -- against the step's own progress, so shortening the step mid-air lands
+    -- the sprite early and reads as a teleport.  Stand down on exactly the
+    -- frames vanilla does.
     local player = ctx.player
     if player and player.ledgeHop then return next(frames, ctx) end
 
-    -- Fewer frames per tile is more speed: 16 -> 8 is FireRed's running
-    -- shoes, and 8 is what this engine's BICYCLE already rides at.  A
-    -- divisor rather than a frame count, so the ratio survives any other
-    -- mod that has already changed the walk it is dividing.
-    return next(math.max(1, math.floor(frames / cfg.mult)), ctx)
+    local cfg = read()
+    local out = frames
+
+    -- ------- 1. the bicycle's own speed, held or not
+
+    if ctx.onBike and cfg.bikeMult ~= 1 then
+      out = out / cfg.bikeMult
+    end
+
+    -- ------- 2. the sprint, on top, while its button is down
+
+    if cfg.sprint then
+      local input = ctx.input
+      if input and input.isDown and input:isDown(cfg.button) then
+        -- Where the sprint stands down.  Both rows default OFF, which is the
+        -- FireRed answer: running shoes are a thing you do on foot.
+        local applies = true
+        if ctx.surfing and not cfg.surf then applies = false end
+        if ctx.onBike and not cfg.bike then applies = false end
+        if applies then out = out / cfg.mult end
+      end
+    end
+
+    if out == frames then return next(frames, ctx) end
+
+    -- Floored once at the end rather than after each divide: two roundings
+    -- compound, and a 1.5x bike under a 1.5x sprint should land on the step
+    -- the arithmetic says it should.  Fewer frames per tile is more speed,
+    -- and one frame is the floor however the rows are set.
+    return next(math.max(1, math.floor(out)), ctx)
   end
 end
 
@@ -100,15 +132,16 @@ function Sprint.install(mod, opt, multipliers)
   local wrapper = Sprint.newWrapper(read)
   local unwrap = nil
 
-  -- SPRINT: OFF leaves the chain rather than short-circuiting inside it;
-  -- see the note at the top of this file for why that is worth the eight
-  -- lines.
+  -- A mod with nothing to say leaves the chain rather than short-circuiting
+  -- inside it; see the note at the top of this file for why that is worth
+  -- the handful of lines.  "Nothing to say" is both rows inert, not just
+  -- SPRINT: OFF -- a player running BIKE SPEED alone still needs the link.
   local function sync()
     cached = nil
-    local on = opt("enabled") and true or false
-    if on and not unwrap then
+    local want = Sprint.wouldActOn(read())
+    if want and not unwrap then
       unwrap = mod.hooks:wrap(Sprint.HOOK, wrapper)
-    elseif not on and unwrap then
+    elseif not want and unwrap then
       unwrap()
       unwrap = nil
     end
@@ -126,12 +159,15 @@ function Sprint.install(mod, opt, multipliers)
 
   return {
     -- Is the sprint engaged right now?  For a neighbouring mod that wants
-    -- to draw or sound something while the player is running.
+    -- to draw or sound something while the player is running.  False while
+    -- SPRINT is off even though the link may still be on the chain for the
+    -- bicycle's sake.
     active = function(game)
-      if not unwrap then return false end
+      local cfg = read()
+      if not cfg.sprint then return false end
       local input = game and game.input
       if not input or not input.isDown then return false end
-      return input:isDown(read().button) and true or false
+      return input:isDown(cfg.button) and true or false
     end,
     -- The live settings, copied: a caller cannot reach in and edit them.
     settings = function()

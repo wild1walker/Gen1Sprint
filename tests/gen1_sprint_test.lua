@@ -17,9 +17,11 @@ local MOD_DIR = script:match("^(.*)/tests/[^/]+%.lua$") or "mods/gen1_sprint"
 local Options = dofile(MOD_DIR .. "/src/options.lua")
 local Sprint = dofile(MOD_DIR .. "/src/sprint.lua")
 
--- The two numbers the whole mod is about: what the engine walks at, and
--- what FireRed's running shoes turn that into.
+-- The numbers the whole mod is about: what the engine walks at, what
+-- FireRed's running shoes turn that into, what Gen 1's bicycle rides at
+-- (the same 8), and where the shipped BIKE SPEED puts it.
 local WALK, RUN = 16, 8
+local BIKE, FAST_BIKE = 8, 4
 
 -- an options reader over a plain table, falling back to the shipped default
 local function reader(overrides)
@@ -137,18 +139,91 @@ do -- surfing: off out of the box, and a row away
     "SPRINT SURFING: ON applies the same multiplier on water")
 end
 
-do -- the bike: the engine has already halved it, and we leave it there
-  T.eq(drive(nil, RUN, { input = pad("b"), onBike = true }), RUN,
-    "the BICYCLE keeps its own 8 frames by default")
-  T.eq(drive({ bike = true }, RUN, { input = pad("b"), onBike = true }), 4,
-    "SPRINT ON BIKE: ON doubles the bike too")
+do -- the bike: SPRINT ON BIKE is still off out of the box, so holding the
+   -- button adds nothing on top of whatever BIKE SPEED already did
+  T.eq(drive({ bike_speed = "1" }, BIKE, { input = pad("b"), onBike = true }),
+    BIKE, "with BIKE SPEED: VANILLA a held button adds nothing on the bike")
+  T.eq(drive({ bike_speed = "1", bike = true }, BIKE,
+    { input = pad("b"), onBike = true }), 4,
+    "SPRINT ON BIKE: ON halves the vanilla bike")
+end
+
+-- ------- BIKE SPEED, which is not a sprint row
+
+do -- the shipped default: the bicycle is faster with nothing held at all
+  T.eq(drive(nil, BIKE, { input = pad(), onBike = true }), FAST_BIKE,
+    "out of the box the bicycle rides at 4 frames a tile, held or not")
+  T.eq(drive(nil, BIKE, { input = pad(), onBike = true }),
+    drive(nil, BIKE, { input = pad("b"), onBike = true }),
+    "and holding the sprint button changes nothing while SPRINT ON BIKE is off")
+end
+
+do -- the ladder the default restores
+  T.eq(drive(nil, WALK, { input = pad() }), WALK, "walking is 16")
+  T.eq(drive(nil, WALK, { input = pad("b") }), RUN, "sprinting is 8")
+  T.eq(drive(nil, BIKE, { input = pad(), onBike = true }), FAST_BIKE,
+    "riding is 4 -- each rung twice the one before it")
+end
+
+do -- VANILLA puts Gen 1's bicycle back exactly
+  T.eq(drive({ bike_speed = "1" }, BIKE, { input = pad(), onBike = true }), BIKE,
+    "BIKE SPEED: VANILLA is the engine's own 8, untouched")
+end
+
+do -- the other rungs
+  T.eq(drive({ bike_speed = "1_5" }, BIKE, { input = pad(), onBike = true }), 5,
+    "1.5x on the bike is 5 frames a tile")
+  T.eq(drive({ bike_speed = "3" }, BIKE, { input = pad(), onBike = true }), 2,
+    "3x is 2")
+end
+
+do -- it is the BICYCLE's row and nothing else's
+  T.eq(drive(nil, WALK, { input = pad() }), WALK,
+    "BIKE SPEED leaves walking alone")
+  T.eq(drive(nil, WALK, { input = pad(), surfing = true }), WALK,
+    "and surfing")
+end
+
+do -- BIKE SPEED works with the sprint switched off entirely
+  T.eq(drive({ enabled = false }, BIKE, { input = pad(), onBike = true }),
+    FAST_BIKE, "the bicycle is still faster with SPRINT: OFF")
+  T.eq(drive({ enabled = false }, WALK, { input = pad("b") }), WALK,
+    "and the button does nothing on foot with SPRINT: OFF")
+end
+
+do -- both rows stacking, which is opt-in on top of a default
+  T.eq(drive({ bike = true }, BIKE, { input = pad("b"), onBike = true }), 2,
+    "SPRINT ON BIKE stacks on the faster bike: 8 -> 4 -> 2")
+  T.eq(drive({ bike = true, bike_speed = "1_5", speed = "1_5" }, BIKE,
+    { input = pad("b"), onBike = true }), 3, "1.5x under 1.5x on an 8 is 3")
+
+  -- Floored once at the end, not after each divide.  Of every bike/sprint
+  -- pair the mod can be set to, this is the ONE that tells the two rules
+  -- apart: 16/2.25 is 7.11 and floors to 7, while rounding as it goes gives
+  -- floor(16/1.5) = 10 and then floor(10/1.5) = 6.  A step is not handed in
+  -- at 16 on the bicycle by this engine, but the hook takes whatever it is
+  -- given -- Gen 2's slopes and any mod that has already moved the bike both
+  -- reach it -- so the arithmetic is pinned here rather than assumed.
+  T.eq(drive({ bike = true, bike_speed = "1_5", speed = "1_5" }, 16,
+    { input = pad("b"), onBike = true }), 7,
+    "compounding roundings would give 6 here; flooring once gives 7")
+end
+
+do -- everything inert is a genuine no-op
+  T.eq(drive({ enabled = false, bike_speed = "1" }, BIKE,
+    { input = pad("b"), onBike = true }), BIKE, "all off changes nothing")
 end
 
 do -- mid-ledge-hop, exactly where vanilla refuses the bike's speedup
   local ctx = { input = pad("b"), player = { ledgeHop = true } }
   T.eq(drive(nil, WALK, ctx), WALK, "a ledge hop is never shortened")
-  T.eq(drive({ bike = true }, RUN, { input = pad("b"), onBike = true,
-    player = { ledgeHop = true } }), RUN, "not on the bike either")
+  T.eq(drive({ bike = true }, BIKE, { input = pad("b"), onBike = true,
+    player = { ledgeHop = true } }), BIKE, "not on the bike either")
+  -- BIKE SPEED is unconditional everywhere else, so this is the one gate it
+  -- has to honour too -- and the one a restructure would quietly drop
+  T.eq(drive(nil, BIKE, { input = pad(), onBike = true,
+    player = { ledgeHop = true } }), BIKE,
+    "and BIKE SPEED does not shorten a hop either, with nothing held")
 end
 
 -- ------- chain manners
@@ -211,29 +286,54 @@ do
     "and walks when it is not")
 end
 
-do -- SPRINT: OFF leaves the chain, so the engine stops building a ctx at all
+-- set one stored option and tell the mod, the way the manager does
+local function setOption(key, value)
   loader.modOptions = loader.modOptions or {}
   loader.modOptions.gen1_sprint = loader.modOptions.gen1_sprint or {}
-  loader.modOptions.gen1_sprint.enabled = false
+  loader.modOptions.gen1_sprint[key] = value
   loader.events:emit("mod.options_changed",
-    { mod = "gen1_sprint", key = "enabled", value = false })
+    { mod = "gen1_sprint", key = key, value = value })
+end
 
+local function chainLength()
   local chain = loader.hooks.chains[Sprint.HOOK]
-  T.check(chain == nil or #chain == 0,
-    "SPRINT: OFF unsubscribes rather than short-circuiting")
-  T.eq(ask(WALK, { input = pad("b") }), WALK,
-    "and B is back to doing nothing")
+  return chain and #chain or 0
+end
 
-  loader.modOptions.gen1_sprint.enabled = true
-  loader.events:emit("mod.options_changed",
-    { mod = "gen1_sprint", key = "enabled", value = true })
-  T.eq(ask(WALK, { input = pad("b") }), RUN, "switching it back on re-subscribes")
+do -- the loaded mod rides faster out of the box, with nothing held
+  T.eq(ask(BIKE, { input = pad(), onBike = true }), FAST_BIKE,
+    "the loaded mod puts the bicycle at 4 frames a tile")
+end
+
+do -- SPRINT: OFF alone does NOT leave the chain any more: BIKE SPEED still
+   -- has something to say, and dropping the link would silently take the
+   -- shipped default with it
+  setOption("enabled", false)
+  T.check(chainLength() > 0,
+    "SPRINT: OFF keeps the link while BIKE SPEED is non-vanilla")
+  T.eq(ask(WALK, { input = pad("b") }), WALK, "B does nothing on foot")
+  T.eq(ask(BIKE, { input = pad(), onBike = true }), FAST_BIKE,
+    "but the bicycle is still faster")
+
+  -- both inert is what empties the chain now
+  setOption("bike_speed", "1")
+  T.eq(chainLength(), 0,
+    "both rows inert unsubscribes rather than short-circuiting")
+  T.eq(ask(BIKE, { input = pad(), onBike = true }), BIKE,
+    "and the bicycle is the engine's own 8 again")
+
+  -- BIKE SPEED alone is enough to bring the link back, with SPRINT still off
+  setOption("bike_speed", "2")
+  T.check(chainLength() > 0, "BIKE SPEED alone re-subscribes")
+  T.eq(ask(BIKE, { input = pad(), onBike = true }), FAST_BIKE,
+    "and rides fast again with SPRINT still off")
+
+  setOption("enabled", true)
+  T.eq(ask(WALK, { input = pad("b") }), RUN, "switching SPRINT back on re-arms it")
 end
 
 do -- a changed row is picked up without a reboot
-  loader.modOptions.gen1_sprint.speed = "3"
-  loader.events:emit("mod.options_changed",
-    { mod = "gen1_sprint", key = "speed", value = "3" })
+  setOption("speed", "3")
   T.eq(ask(WALK, { input = pad("b") }), 5, "the new SPRINT SPEED took effect live")
 
   -- and another mod's broadcast does not disturb this one
@@ -251,6 +351,7 @@ do -- the exports neighbouring mods get
   T.eq(sprint.active({ input = pad("b") }), true, "active() sees the held button")
   T.eq(sprint.active({ input = pad() }), false, "and an empty pad")
   T.eq(sprint.settings().mult, 2, "settings() reports the live multiplier")
+  T.eq(sprint.settings().bikeMult, 2, "and the bicycle's")
   T.eq(sprint.stepFrames(WALK, { input = pad("b") }), RUN,
     "stepFrames() answers what a step would become")
 end
