@@ -4,7 +4,9 @@ All notable changes to Gen1Sprint are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this mod uses
 [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
-## 0.3.0 - 2026-08-29
+## [Unreleased]
+
+## [0.3.0] - 2026-08-29
 
 ### Fixed
 - **Professor Oak no longer hops his way to the lab.** Sprinting applied to
@@ -23,8 +25,6 @@ All notable changes to Gen1Sprint are documented here. The format follows
   Only the **player's** own scripted moves count — an NPC walking elsewhere on
   the map is not this — and with no overworld to ask (title screen, battle, a
   test stub) the answer is simply "not scripted", so nothing else changes.
-
-## [Unreleased]
 
 ## [0.2.0] - 2026-08-26
 
