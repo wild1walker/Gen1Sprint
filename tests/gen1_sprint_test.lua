@@ -44,11 +44,11 @@ end
 
 -- Drive the wrapper the way Player:stepLength does, and report both the
 -- frame count it settled on and the ctx the next link was handed.
-local function drive(overrides, frames, ctx)
+local function drive(overrides, frames, ctx, world)
   local opt = reader(overrides)
   local wrapper = Sprint.newWrapper(function()
     return Sprint.snapshot(opt, Options.MULTIPLIERS)
-  end)
+  end, world)
   local sawCtx, calls = nil, 0
   local got = wrapper(function(value, forwarded)
     calls = calls + 1
@@ -354,6 +354,42 @@ do -- the exports neighbouring mods get
   T.eq(sprint.settings().bikeMult, 2, "and the bicycle's")
   T.eq(sprint.stepFrames(WALK, { input = pad("b") }), RUN,
     "stepFrames() answers what a step would become")
+end
+
+-- ------- a script walking you is not you walking
+--
+-- The engine drives a cutscene walk through scriptMoves and asks stepLength
+-- for its duration exactly as it does for a real step, so a held B used to
+-- shorten those too.  That desynchronised the Oak escort, which pins his walk
+-- to the player's live speed once and then drives the pair off the player's
+-- completion: Oak could be left running at double the speed the player was
+-- actually walking, finishing each step early and standing waiting for them.
+
+do
+  local function worldWith(moves)
+    return { overworld = function() return { scriptMoves = moves } end }
+  end
+
+  local player = {}
+  local ctx = { player = player, input = pad("b"), onBike = false }
+  local sprinting = { enabled = true, button = "b", speed = "2" }
+
+  T.eq(drive(sprinting, 16, ctx, worldWith({})), 8,
+    "with nothing scripted, a held B still sprints")
+  T.eq(drive(sprinting, 16, ctx, worldWith({ { entity = {} } })), 8,
+    "an NPC's scripted move is not the player's")
+  T.eq(drive(sprinting, 16, ctx, worldWith({ { entity = player } })), 16,
+    "a script walking the PLAYER refuses the sprint")
+
+  local _, sawCtx = drive(sprinting, 16, ctx, worldWith({ { entity = player } }))
+  T.eq(sawCtx, ctx, "and the next link is still handed the context")
+
+  T.eq(drive(sprinting, 16, ctx, nil), 8,
+    "no world to ask: sprint applies as before")
+  T.eq(drive(sprinting, 16, ctx, { overworld = function() return nil end }), 8,
+    "no overworld up: sprint applies as before")
+  T.eq(drive(sprinting, 16, ctx, { overworld = function() error("boom") end }), 8,
+    "a world that throws is survived, not propagated")
 end
 
 run.release()
