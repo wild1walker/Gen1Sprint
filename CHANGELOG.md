@@ -4,6 +4,26 @@ All notable changes to Gen1Sprint are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this mod uses
 [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.3.0 - 2026-08-29
+
+### Fixed
+- **Professor Oak no longer hops his way to the lab.** Sprinting applied to
+  cutscene walking as well as your own, because the engine drives a scripted
+  walk through `scriptMoves` and asks `stepLength` for its duration exactly as
+  it does for a real step. A held sprint button shortened those too.
+
+  That was not only unfaithful, it desynchronised the one cutscene that reads
+  your live speed. `story2.lua`'s Oak escort pins his walk to yours **once**,
+  at the top — `oak.stepFrames = ow.player.stepFramesCur` — and then drives the
+  pair off *your* completion. So Oak could be left running at double the speed
+  you were actually walking: he finished each step in half the time and then
+  stood waiting for you. Step, pause, step, pause, the whole way to the lab.
+
+  A step a script is walking you through is now the game's speed, never yours.
+  Only the **player's** own scripted moves count — an NPC walking elsewhere on
+  the map is not this — and with no overworld to ask (title screen, battle, a
+  test stub) the answer is simply "not scripted", so nothing else changes.
+
 ## [Unreleased]
 
 ## [0.2.0] - 2026-08-26
