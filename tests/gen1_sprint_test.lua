@@ -392,5 +392,101 @@ do
     "a world that throws is survived, not propagated")
 end
 
+-- ------- a sprinted step does not outlive its step
+--
+-- stepFramesCur is the engine's "how long is the step in flight", written
+-- out of stepLength() -- the number this mod shortens -- and never cleared
+-- when the step lands.  The escort scripts read it as "how fast does the
+-- player move" and pin an NPC's own step to it:
+--
+--     guy.stepFrames = ow.player.stepFramesCur or ow.player.stepFrames
+--
+-- So an escort begun with B held pinned its guide to the SPRINTING length
+-- while the escort's own scripted steps refused the sprint and ran at the
+-- walking one.  The guide darted a tile in half the frames and then stood
+-- frozen for the other half, a tile at a time, all the way there.
+
+do
+  local Options2 = Options   -- same module; named for the reader's sake
+  local hooks, events = {}, {}
+  local unwrapped = {}
+
+  -- Enough of the mod host for install(): the hook chain, the event bus and
+  -- a world whose overworld holds the player being repaired.
+  local player = {
+    stepFrames = WALK,
+    bikeStepFrames = BIKE,
+    moving = false,
+    stepFramesCur = RUN,          -- left behind by the last sprinting step
+    onBike = false,
+  }
+  -- Player:stepLength, as far as this is about it: the engine's own answer,
+  -- put through whatever is on the movement.speed chain.
+  function player:stepLength()
+    local frames = self.onBike and self.bikeStepFrames or self.stepFrames
+    local link = hooks[Sprint.HOOK]
+    if not link then return frames end
+    return link(function(f) return f end, frames,
+      { player = self, input = pad("b"), onBike = self.onBike,
+        surfing = false })
+  end
+
+  local scriptMoves = {}
+  local mod = {
+    id = "gen1_sprint",
+    hooks = { wrap = function(_, name, fn)
+      hooks[name] = fn
+      return function() hooks[name] = nil; unwrapped[name] = true end
+    end },
+    events = { on = function(_, name, fn) events[name] = fn end },
+    world = { overworld = function()
+      return { player = player, scriptMoves = scriptMoves }
+    end },
+  }
+
+  local opt = reader({ enabled = true, button = "b", speed = "2" })
+  local handle = Sprint.install(mod, opt, Options2.MULTIPLIERS)
+
+  T.check(type(events["world.stepped"]) == "function",
+    "install listens for a landed step")
+
+  T.eq(player.stepFramesCur, RUN,
+    "the stale value the escort scripts would have read")
+  events["world.stepped"]()
+  T.eq(player.stepFramesCur, WALK,
+    "a landed step puts the WALKING length back")
+
+  -- ...and the sprint itself is untouched: the repair stands this mod down
+  -- for its own question only, not for the next real step.
+  T.eq(player:stepLength(), RUN,
+    "the very next step still sprints, B being held")
+
+  -- On a bicycle the walking length is the BIKE's, not stepFrames'.  Clearing
+  -- the field instead of asking would have handed a script sixteen here and
+  -- desynced the escort the other way round.
+  player.onBike = true
+  player.stepFramesCur = FAST_BIKE
+  events["world.stepped"]()
+  T.eq(player.stepFramesCur, BIKE,
+    "on a bike it is the bike's length that comes back, not the walk's")
+  player.onBike = false
+
+  -- A step already in flight still owns its own length: a chained step -- a
+  -- held direction, a scripted walk -- can be moving by the time this runs.
+  player.moving = true
+  player.stepFramesCur = RUN
+  events["world.stepped"]()
+  T.eq(player.stepFramesCur, RUN,
+    "a step still in flight keeps the length it started on")
+  player.moving = false
+
+  -- and the whole thing survives a world that is not there
+  mod.world = nil
+  local ok = pcall(events["world.stepped"])
+  T.check(ok, "no world to ask is survived rather than thrown")
+
+  handle.settings()   -- the handle still works after all of it
+end
+
 run.release()
 T.finish("gen1_sprint")

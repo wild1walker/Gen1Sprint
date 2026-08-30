@@ -6,6 +6,43 @@ All notable changes to Gen1Sprint are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-08-30
+
+### Fixed
+- **And the youngster no longer hops his way to Brock's gym.** 0.3.0 fixed
+  half of this: a scripted walk stopped taking the sprint, so the *player's*
+  cutscene steps run at the walking length again. The other half was still
+  there, and it is the half the escorts actually read.
+
+  `stepFramesCur` is the engine's "how many frames is the step currently in
+  flight", written out of `stepLength()` — the number this mod shortens — and
+  never cleared when the step lands. The escort scripts read it as something
+  else entirely, *"how fast does the player move"*, to pin an NPC's own step
+  to it:
+
+  ```lua
+  guy.stepFrames = ow.player.stepFramesCur or ow.player.stepFrames
+  ```
+
+  So an escort begun with **B held** pinned its guide to the *sprinting*
+  length while the escort's own scripted steps refused the sprint and ran at
+  the *walking* one. The guide darted a tile in half the frames and then stood
+  frozen for the other half, a tile at a time, the whole way there:
+
+  ```
+  in step     ...LLLLLLLL...._...LLLLLLLL...._
+  pinned to 8 ...LLLL_________LLL...._________
+              ( . standing, L stepping, _ arrived and waiting )
+  ```
+
+  A sprinted step no longer outlives its step: the walking length goes back
+  the moment a step lands, which is what the engine would have had if this mod
+  were not here. It asks `stepLength()` again with this mod standing down
+  rather than clearing the field — on a **bicycle** the walking length is the
+  bike's eight frames, not `stepFrames`' sixteen, and a script falling back to
+  `stepFrames` would desync the same way in the other direction. A step still
+  in flight keeps the length it started on.
+
 ## [0.3.0] - 2026-08-29
 
 ### Fixed

@@ -1,7 +1,7 @@
 {
   "id": "gen1_sprint",
   "name": "Gen1Sprint",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "api": 2,
   "entry": "main.lua",
   "profile": "content",
